@@ -109,10 +109,15 @@
 #   (optional) Enable or not ARP Spoofing Protection
 #   Defaults to true
 #
+# [*extensions*]
+#   (optional) Extensions list to use
+#   Defaults to empty list
+#
 class neutron::agents::ml2::ovs (
   $package_ensure             = 'present',
   $enabled                    = true,
   $manage_service             = true,
+  $extensions                 = [],
   $bridge_uplinks             = [],
   $bridge_mappings            = [],
   $integration_bridge         = 'br-int',
@@ -173,6 +178,10 @@ class neutron::agents::ml2::ovs (
         before => Service['neutron-ovs-agent-service'],
       }
     }
+  }
+
+  if !empty($extensions) {
+    neutron_agent_ovs { 'agent/extensions': value => join(any2array($extensions), ',') }
   }
 
   neutron_agent_ovs {

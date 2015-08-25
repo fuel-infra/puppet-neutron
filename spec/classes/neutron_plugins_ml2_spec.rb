@@ -32,6 +32,7 @@ describe 'neutron::plugins::ml2' do
     { :type_drivers          => ['local', 'flat', 'vlan', 'gre', 'vxlan'],
       :tenant_network_types  => ['local', 'flat', 'vlan', 'gre', 'vxlan'],
       :mechanism_drivers     => ['openvswitch', 'linuxbridge'],
+      :extension_drivers     => [],
       :flat_networks         => '*',
       :network_vlan_ranges   => '10:50',
       :tunnel_id_ranges      => '20:100',
@@ -85,6 +86,16 @@ describe 'neutron::plugins::ml2' do
           :ensure => p[:package_ensure],
           :tag    => 'openstack'
         )
+      end
+    end
+
+    context 'when using extension drivers for ML2 plugin' do
+      before :each do
+        params.merge!(:extension_drivers => ['port_security','qos'])
+      end
+
+      it 'configures extension drivers' do
+        is_expected.to contain_neutron_plugin_ml2('ml2/extension_drivers').with_value(p[:extension_drivers].join(','))
       end
     end
 

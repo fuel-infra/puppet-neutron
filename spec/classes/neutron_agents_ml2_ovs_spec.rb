@@ -11,6 +11,7 @@ describe 'neutron::agents::ml2::ovs' do
       :enabled                    => true,
       :bridge_uplinks             => [],
       :bridge_mappings            => [],
+      :extensions                 => [],
       :integration_bridge         => 'br-int',
       :enable_tunneling           => false,
       :local_ip                   => false,
@@ -173,6 +174,16 @@ describe 'neutron::agents::ml2::ovs' do
         is_expected.not_to contain_neutron__plugins__ovs__port(params[:bridge_uplinks].join(',')).with(
           :before => 'Service[neutron-ovs-agent-service]'
         )
+      end
+    end
+
+    context 'when supplying extensions for ML2 plugin' do
+      before :each do
+        params.merge!(:extensions => ['qos'])
+      end
+
+      it 'configures extensions' do
+        is_expected.to contain_neutron_agent_ovs('agent/extensions').with_value(params[:extensions].join(','))
       end
     end
 

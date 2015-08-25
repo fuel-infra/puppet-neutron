@@ -34,7 +34,8 @@ describe 'neutron::server' do
       :max_l3_agents_per_router         => 3,
       :min_l3_agents_per_router         => 2,
       :l3_ha_net_cidr                   => '169.254.192.0/18',
-      :allow_automatic_l3agent_failover => false
+      :allow_automatic_l3agent_failover => false,
+      :qos_notification_drivers         => 'message_queue'
     }
   end
 
@@ -96,6 +97,7 @@ describe 'neutron::server' do
       is_expected.to contain_neutron_config('DEFAULT/rpc_workers').with_value(facts[:processorcount])
       is_expected.to contain_neutron_config('DEFAULT/agent_down_time').with_value(p[:agent_down_time])
       is_expected.to contain_neutron_config('DEFAULT/router_scheduler_driver').with_value(p[:router_scheduler_driver])
+      is_expected.to contain_neutron_config('qos/notification_drivers').with_value(p[:qos_notification_drivers])
     end
 
     context 'with manage_service as false' do
