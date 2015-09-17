@@ -18,8 +18,10 @@ describe 'neutron::agents::ml2::ovs' do
       :polling_interval           => 2,
       :l2_population              => false,
       :arp_responder              => false,
+      :drop_flows_on_start        => false,
       :enable_distributed_routing => false,
-      :firewall_driver            => 'neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver' }
+      :firewall_driver            => 'neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver',
+      :manage_vswitch             => true }
   end
 
   let :default_facts do
@@ -43,6 +45,7 @@ describe 'neutron::agents::ml2::ovs' do
       is_expected.to contain_neutron_agent_ovs('agent/polling_interval').with_value(p[:polling_interval])
       is_expected.to contain_neutron_agent_ovs('agent/l2_population').with_value(p[:l2_population])
       is_expected.to contain_neutron_agent_ovs('agent/arp_responder').with_value(p[:arp_responder])
+      is_expected.to contain_neutron_agent_ovs('agent/drop_flows_on_start').with_value(p[:drop_flows_on_start])
       is_expected.to contain_neutron_agent_ovs('ovs/integration_bridge').with_value(p[:integration_bridge])
       is_expected.to contain_neutron_agent_ovs('securitygroup/firewall_driver').\
         with_value(p[:firewall_driver])
@@ -58,7 +61,6 @@ describe 'neutron::agents::ml2::ovs' do
           :ensure => p[:package_ensure],
           :tag    => ['openstack', 'neutron-package'],
         )
-        is_expected.to contain_package('neutron-ovs-agent').with_before(/Neutron_agent_ovs\[.+\]/)
       else
       end
     end
@@ -115,6 +117,10 @@ describe 'neutron::agents::ml2::ovs' do
         params.merge!(:bridge_uplinks => ['br-ex:eth2'],:bridge_mappings => ['default:br-ex'])
       end
 
+      it 'should require vswitch::ovs' do
+        is_expected.to contain_class('vswitch::ovs')
+      end
+
       it 'configures bridge mappings' do
         is_expected.to contain_neutron_agent_ovs('ovs/bridge_mappings')
       end
@@ -127,6 +133,32 @@ describe 'neutron::agents::ml2::ovs' do
 
       it 'should configure bridge uplinks' do
         is_expected.to contain_neutron__plugins__ovs__port(params[:bridge_uplinks].join(',')).with(
+          :before => 'Service[neutron-ovs-agent-service]'
+        )
+      end
+    end
+
+    context 'when supplying bridge mappings for provider networks with manage vswitch set to false' do
+      before :each do
+        params.merge!(:bridge_uplinks => ['br-ex:eth2'],:bridge_mappings => ['default:br-ex'], :manage_vswitch => false)
+      end
+
+      it 'should not require vswitch::ovs' do
+        is_expected.not_to contain_class('vswitch::ovs')
+      end
+
+      it 'configures bridge mappings' do
+        is_expected.to contain_neutron_agent_ovs('ovs/bridge_mappings')
+      end
+
+      it 'should not configure bridge mappings' do
+        is_expected.not_to contain_neutron__plugins__ovs__bridge(params[:bridge_mappings].join(',')).with(
+          :before => 'Service[neutron-ovs-agent-service]'
+        )
+      end
+
+      it 'should not configure bridge uplinks' do
+        is_expected.not_to contain_neutron__plugins__ovs__port(params[:bridge_uplinks].join(',')).with(
           :before => 'Service[neutron-ovs-agent-service]'
         )
       end
