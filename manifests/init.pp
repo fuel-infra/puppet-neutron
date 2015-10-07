@@ -123,7 +123,11 @@
 
 # [*rpc_backend*]
 #   (optional) what rpc/queuing service to use
-#   Defaults to impl_kombu (rabbitmq)
+#   Defaults to rabbit (rabbitmq)
+#
+# [*rpc_response_timeout*]
+#   (optional) Seconds to wait for a response from a call
+#   Defaults to 60
 #
 # [*rabbit_password*]
 # [*rabbit_host*]
@@ -273,7 +277,8 @@ class neutron (
   $report_interval                    = '30',
   $memcache_servers                   = false,
   $control_exchange                   = 'neutron',
-  $rpc_backend                        = 'neutron.openstack.common.rpc.impl_kombu',
+  $rpc_backend                        = 'rabbit',
+  $rpc_response_timeout               = 60,
   $rabbit_password                    = false,
   $rabbit_host                        = 'localhost',
   $rabbit_hosts                       = false,
@@ -354,6 +359,9 @@ class neutron (
     tag    => ['openstack', 'neutron-package'],
   }
 
+  # Make sure all services get restarted if neutron-common package is upgraded
+  Package['neutron'] ~> Service<| tag == 'neutron-service' |>
+
   neutron_config {
     'DEFAULT/verbose':                 value => $verbose;
     'DEFAULT/debug':                   value => $debug;
@@ -377,6 +385,7 @@ class neutron (
     'DEFAULT/api_extensions_path':     value => $api_extensions_path;
     'DEFAULT/state_path':              value => $state_path;
     'DEFAULT/lock_path':               value => $lock_path;
+    'DEFAULT/rpc_response_timeout':    value => $rpc_response_timeout;
     'agent/root_helper':               value => $root_helper;
     'agent/report_interval':           value => $report_interval;
   }
@@ -430,7 +439,7 @@ class neutron (
   }
 
 
-  if $rpc_backend == 'neutron.openstack.common.rpc.impl_kombu' {
+  if $rpc_backend == 'rabbit' or $rpc_backend == 'neutron.openstack.common.rpc.impl_kombu' {
     if ! $rabbit_password {
       fail('When rpc_backend is rabbitmq, you must set rabbit password')
     }
@@ -491,7 +500,7 @@ class neutron (
 
   }
 
-  if $rpc_backend == 'neutron.openstack.common.rpc.impl_qpid' {
+  if $rpc_backend == 'qpid' or $rpc_backend == 'neutron.openstack.common.rpc.impl_qpid' {
     neutron_config {
       'DEFAULT/qpid_hostname':               value => $qpid_hostname;
       'DEFAULT/qpid_port':                   value => $qpid_port;
