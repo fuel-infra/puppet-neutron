@@ -1,4 +1,5 @@
 require 'csv'
+require 'json'
 require 'puppet/util/inifile'
 
 class Puppet::Provider::Neutron < Puppet::Provider
@@ -132,39 +133,67 @@ correctly configured.")
     @neutron_credentials = nil
   end
 
+  def self.find_and_parse_json(text)
+    # saparate json from any possible garbage around it and parse
+    unless text.is_a? Array
+      text = text.split("\n")
+    end
+    rv = []
+    found = false
+    (0..text.size-1).reverse_each do |line_no|
+      if text[line_no] =~ /\]\s*$/
+        end_of_json_line_no = line_no
+        (0..end_of_json_line_no).reverse_each do |start_of_json_line_no|
+          if text[start_of_json_line_no] =~ /^\s*\[/
+            begin
+              js_txt = text[start_of_json_line_no..end_of_json_line_no].join('')
+              rv = JSON.parse(js_txt)
+              found = true
+            rescue
+              # do nothing, next iteration please, because found==false
+            end
+          end
+          break if found
+        end
+      end
+      break if found
+    end
+    rv
+  end
+
   def self.list_neutron_resources(type)
     ids = []
-    list = auth_neutron("#{type}-list", '--format=csv',
-                        '--column=id', '--quote=none')
+    list = auth_neutron("#{type}-list", '--format=json',
+                        '--column=id')
     if list.nil?
       raise(Puppet::ExecutionFailure, "Can't retrieve #{type}-list because Neutron or Keystone API is not available.")
     end
 
-    (list.split("\n")[1..-1] || []).compact.collect do |line|
-      ids << line.strip
+    self.find_and_parse_json(list).each do |line|
+      ids << line['id']
     end
+
     return ids
   end
 
   def self.get_neutron_resource_attrs(type, id)
     attrs = {}
-    net = auth_neutron("#{type}-show", '--format=shell', id)
+    net = auth_neutron("#{type}-show", '--format=json', id)
     if net.nil?
       raise(Puppet::ExecutionFailure, "Can't retrieve #{type}-show because Neutron or Keystone API is not available.")
     end
 
-    last_key = nil
-    (net.split("\n") || []).compact.collect do |line|
-      if line.include? '='
-        k, v = line.split('=', 2)
-        attrs[k] = v.gsub(/\A"|"\Z/, '')
-        last_key = k
-      else
-        # Handle the case of a list of values
-        v = line.gsub(/\A"|"\Z/, '')
-        attrs[last_key] = [attrs[last_key], v].flatten
+    self.find_and_parse_json(net).each do |line|
+      k = line['Field']
+      v = line['Value']
+      if v.is_a? String and v =~ /\n/
+        v = v.split(/\n/)
+      elsif v.is_a? Numeric or v.is_a? TrueClass or v.is_a? FalseClass
+        v = "#{v}"
       end
+      attrs[k] = v
     end
+
     return attrs
   end
 

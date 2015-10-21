@@ -133,9 +133,9 @@ describe Puppet::Provider::Neutron do
 
     it 'should exclude the column header' do
       output = <<-EOT
-        id
-        net1
-        net2
+        bla-bla-bla
+
+        [{"id": "net1"},{"id": "net2"}]
       EOT
       klass.expects(:auth_neutron).returns(output)
       result = klass.list_neutron_resources('foo')
@@ -143,6 +143,19 @@ describe Puppet::Provider::Neutron do
     end
 
     it 'should return empty list when there are no neutron resources' do
+      output = <<-EOT
+        bla-bla-bla
+
+        []
+
+        bla-bla
+      EOT
+      klass.stubs(:auth_neutron).returns(output)
+      result = klass.list_neutron_resources('foo')
+      expect(result).to eql([])
+    end
+
+    it 'should return empty respons when there are no neutron resources' do
       output = <<-EOT
       EOT
       klass.stubs(:auth_neutron).returns(output)
@@ -162,16 +175,21 @@ describe Puppet::Provider::Neutron do
   describe 'when retrieving attributes for neutron resources' do
 
     it 'should parse single-valued attributes into a key-value pair' do
-      klass.expects(:auth_neutron).returns('admin_state_up="True"')
+      output = <<-EOT
+        bla-bla-bla
+
+        [{"Field": "admin_state_up", "Value": true}]
+      EOT
+      klass.expects(:auth_neutron).returns(output)
       result = klass.get_neutron_resource_attrs('foo', 'id')
-      expect(result).to eql({"admin_state_up" => 'True'})
+      expect(result).to eql({"admin_state_up" => "true"})
     end
 
     it 'should parse multi-valued attributes into a key-list pair' do
       output = <<-EOT
-subnets="subnet1
-subnet2
-subnet3"
+        bla-bla-bla
+
+        [{"Field": "subnets", "Value": "subnet1\\nsubnet2\\nsubnet3"}]
       EOT
       klass.expects(:auth_neutron).returns(output)
       result = klass.get_neutron_resource_attrs('foo', 'id')
@@ -241,6 +259,44 @@ tenant_id="3056a91768d948d399f1d79051a7f221"
         'tenant_id'      => '3056a91768d948d399f1d79051a7f221',
       }
       expect(klass.parse_creation_output(data)).to eq(expected)
+    end
+
+  end
+
+  describe 'should parse valid json output, covered by garbage' do
+
+    it 'should parse valid output into a list of hashes' do
+      data = '''
+        /usr/lib/python2.7/dist-packages/urllib3/util/ssl_.py:90: InsecurePlatformWarning: A true SSLContext object is not available. This prevents urllib3 from configuring SSL appropriately and may cause certain SSL connections to fail. For more information, see https://urllib3.readthedocs.org/en/latest/security.html#insecureplatformwarning.
+          InsecurePlatformWarning
+        /usr/lib/python2.7/dist-packages/urllib3/connection.py:251: SecurityWarning: Certificate has no `subjectAltName`, falling back to check for a `commonName` for now. This feature is being removed by major browsers and deprecated by RFC 2818. (See https://github.com/shazow/urllib3/issues/497 for details.)
+          SecurityWarning
+        [{"Field": "allocation_pools", "Value": "{\"start\": \"192.168.111.2\", \"end\": \"192.168.111.254\"}"}, {"Field": "cidr", "Value": "192.168.111.0/24"},
+        {"Field": "dns_nameservers", "Value": "8.8.4.4\n8.8.8.8"}, {"Field": "enable_dhcp", "Value": true}, {"Field": "gateway_ip", "Value": "192.168.111.1"}, {"Field": "host_routes", "Value": ""}, {"Field": "id", "Value": "b87fbfd1-0e52-4ab6-8987-286ef0912d1f"}, {"Field": "ip_version", "Value": 4}, {"Field": "ipv6_address_mode", "Value": ""}, {"Field": "ipv6_ra_mode", "Value": ""},
+        {"Field": "XXX", "Value":
+        [1,
+        2,3]},
+        {"Field": "name", "Value": "net04__subnet"}, {"Field": "network_id", "Value": "d70b399b-668b-4861-b092-4876ec65df60"}, {"Field": "subnetpool_id", "Value": ""}, {"Field": "tenant_id", "Value": "2764315d0ec24a07bf3773057aa51142"}]
+        xxx yyy zz
+        eof
+      '''
+      expected = [
+        {"Field"=>"allocation_pools", "Value"=>"{\"start\": \"192.168.111.2\", \"end\": \"192.168.111.254\"}"},
+        {"Field"=>"cidr", "Value"=>"192.168.111.0/24"},
+        {"Field"=>"dns_nameservers", "Value"=>"8.8.4.4\n8.8.8.8"},
+        {"Field"=>"enable_dhcp", "Value"=>true},
+        {"Field"=>"gateway_ip", "Value"=>"192.168.111.1"},
+        {"Field"=>"host_routes", "Value"=>""},
+        {"Field"=>"id", "Value"=>"b87fbfd1-0e52-4ab6-8987-286ef0912d1f"},
+        {"Field"=>"ip_version", "Value"=>4},
+        {"Field"=>"ipv6_address_mode", "Value"=>""},
+        {"Field"=>"ipv6_ra_mode", "Value"=>""},
+        {"Field"=>"XXX", "Value"=>[1, 2, 3]},
+        {"Field"=>"name", "Value"=>"net04__subnet"},
+        {"Field"=>"network_id", "Value"=>"d70b399b-668b-4861-b092-4876ec65df60"},
+        {"Field"=>"subnetpool_id", "Value"=>""},
+        {"Field"=>"tenant_id", "Value"=>"2764315d0ec24a07bf3773057aa51142"}]
+      expect(klass.find_and_parse_json(data)).to eq(expected)
     end
 
   end
