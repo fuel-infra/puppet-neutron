@@ -182,7 +182,7 @@ describe Puppet::Provider::Neutron do
       EOT
       klass.expects(:auth_neutron).returns(output)
       result = klass.get_neutron_resource_attrs('foo', 'id')
-      expect(result).to eql({"admin_state_up" => "true"})
+      expect(result).to eql({"admin_state_up" => "True"})
     end
 
     it 'should parse multi-valued attributes into a key-list pair' do
@@ -303,7 +303,32 @@ tenant_id="3056a91768d948d399f1d79051a7f221"
         {"Field"=>"tenant_id", "Value"=>"2764315d0ec24a07bf3773057aa51142"}]
       expect(klass.find_and_parse_json(data)).to eq(expected)
     end
+  end
 
+  describe 'should parse valid json output, and convert booleans to idempotent strings' do
+    it 'boolean values should converted to capitalized strings' do
+      output = '''
+        [{"Field": "allocation_pools", "Value": "{\"start\": \"192.168.111.2\", \"end\": \"192.168.111.254\"}"}, {"Field": "cidr", "Value": "192.168.111.0/24"},
+        {"Field": "dns_nameservers", "Value": "8.8.4.4\n8.8.8.8"}, {"Field": "enable_dhcp", "Value": true}, {"Field": "gateway_ip", "Value": "192.168.111.1"}, {"Field": "host_routes", "Value": ""}, {"Field": "id", "Value": "b87fbfd1-0e52-4ab6-8987-286ef0912d1f"}, {"Field": "ip_version", "Value": 4}, {"Field": "ipv6_address_mode", "Value": ""}, {"Field": "ipv6_ra_mode", "Value": ""},
+        {"Field": "YYY", "Value": false}]
+      '''
+      klass.stubs(:auth_neutron).returns(output)
+      result = klass.get_neutron_resource_attrs 'foo', nil
+      expect(result['enable_dhcp']).to eql('True')
+      expect(result['YYY']).to eql('False')
+    end
+
+    it 'stringifyed boolean values should converted to capitalized strings' do
+      output = '''
+        [{"Field": "allocation_pools", "Value": "{\"start\": \"192.168.111.2\", \"end\": \"192.168.111.254\"}"}, {"Field": "cidr", "Value": "192.168.111.0/24"},
+        {"Field": "dns_nameservers", "Value": "8.8.4.4\n8.8.8.8"}, {"Field": "enable_dhcp", "Value": "True"}, {"Field": "gateway_ip", "Value": "192.168.111.1"}, {"Field": "host_routes", "Value": ""}, {"Field": "id", "Value": "b87fbfd1-0e52-4ab6-8987-286ef0912d1f"}, {"Field": "ip_version", "Value": 4}, {"Field": "ipv6_address_mode", "Value": ""}, {"Field": "ipv6_ra_mode", "Value": ""},
+        {"Field": "YYY", "Value": "false"}]
+      '''
+      klass.stubs(:auth_neutron).returns(output)
+      result = klass.get_neutron_resource_attrs 'foo', nil
+      expect(result['enable_dhcp']).to eql('True')
+      expect(result['YYY']).to eql('False')
+    end
   end
 
 end

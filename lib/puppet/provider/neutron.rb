@@ -188,9 +188,13 @@ correctly configured.")
     self.find_and_parse_json(net).each do |line|
       k = line['Field']
       v = line['Value']
-      if v.is_a? String and v =~ /\n/
+      if ['True', 'False'].include? v.to_s.capitalize
+        v = "#{v}".capitalize
+      elsif v.is_a? String and v =~ /\n/
         v = v.split(/\n/)
-      elsif v.is_a? Numeric or v.is_a? TrueClass or v.is_a? FalseClass
+      elsif v.is_a? Numeric
+        v = "#{v}"
+      else
         v = "#{v}"
       end
       attrs[k] = v
