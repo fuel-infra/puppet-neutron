@@ -134,11 +134,13 @@ correctly configured.")
   end
 
   def self.find_and_parse_json(text)
-    # saparate json from any possible garbage around it and parse
-    unless text.is_a? Array
-      text = text.split("\n")
-    end
+    # separate json from any possible garbage around it and parse
     rv = []
+    if text.is_a? String
+      text = text.split("\n")
+    elsif !text.is_a? Array
+      return rv
+    end
     found = false
     (0..text.size-1).reverse_each do |line_no|
       if text[line_no] =~ /\]\s*$/
@@ -200,25 +202,18 @@ correctly configured.")
   def self.list_router_ports(router_name_or_id)
     results = []
     cmd_output = auth_neutron("router-port-list",
-                              '--format=csv',
+                              '--format=json',
                               router_name_or_id)
-    if ! cmd_output
-      return results
+
+    self.find_and_parse_json(cmd_output).each do |port|
+      if port['fixed_ips']
+        fixed_ips = JSON.parse(port['fixed_ips'])
+        port['subnet_id'] = fixed_ips['subnet_id']
+        port.delete('fixed_ips')
+      end
+      results << port
     end
 
-    headers = nil
-    CSV.parse(cmd_output) do |row|
-      if headers == nil
-        headers = row
-      else
-        result = Hash[*headers.zip(row).flatten]
-        match_data = /.*"subnet_id": "(.*)", .*/.match(result['fixed_ips'])
-        if match_data
-          result['subnet_id'] = match_data[1]
-        end
-        results << result
-      end
-    end
     return results
   end
 
