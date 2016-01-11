@@ -32,7 +32,6 @@ describe 'neutron::plugins::ml2' do
     { :type_drivers          => ['local', 'flat', 'vlan', 'gre', 'vxlan'],
       :tenant_network_types  => ['local', 'flat', 'vlan', 'gre', 'vxlan'],
       :mechanism_drivers     => ['openvswitch', 'linuxbridge'],
-      :extension_drivers     => [],
       :flat_networks         => '*',
       :network_vlan_ranges   => '10:50',
       :tunnel_id_ranges      => '20:100',
@@ -43,7 +42,7 @@ describe 'neutron::plugins::ml2' do
       :package_ensure        => 'present' }
   end
 
-  let :default_facts do
+  let :test_facts do
     { :operatingsystem           => 'default',
       :operatingsystemrelease    => 'default'
     }
@@ -68,6 +67,7 @@ describe 'neutron::plugins::ml2' do
       is_expected.to contain_neutron_plugin_ml2('ml2/type_drivers').with_value(p[:type_drivers].join(','))
       is_expected.to contain_neutron_plugin_ml2('ml2/tenant_network_types').with_value(p[:tenant_network_types].join(','))
       is_expected.to contain_neutron_plugin_ml2('ml2/mechanism_drivers').with_value(p[:mechanism_drivers].join(','))
+      is_expected.to contain_neutron_plugin_ml2('ml2/extension_drivers').with_value('<SERVICE DEFAULT>')
       is_expected.to contain_neutron_plugin_ml2('ml2/path_mtu').with_value(p[:path_mtu])
       is_expected.to contain_neutron_plugin_ml2('ml2/physical_network_mtus').with_ensure('absent')
     end
@@ -227,8 +227,8 @@ describe 'neutron::plugins::ml2' do
         )
       end
       it 'configures sriov mechanism driver with agent_enabled' do
-        is_expected.to contain_neutron_plugin_ml2('ml2_sriov/supported_pci_vendor_devs').with_value(['15b3:1004,8086:10ca'])
-        is_expected.to contain_neutron_plugin_ml2('ml2_sriov/agent_required').with_value('true')
+        is_expected.to contain_neutron_plugin_sriov('ml2_sriov/agent_required').with_value('true')
+        is_expected.to contain_neutron_plugin_sriov('ml2_sriov/supported_pci_vendor_devs').with_value(['15b3:1004,8086:10ca'])
       end
     end
 
@@ -250,7 +250,9 @@ describe 'neutron::plugins::ml2' do
 
   context 'on Debian platforms' do
     let :facts do
-      default_facts.merge({ :osfamily => 'Debian' })
+      @default_facts.merge(test_facts.merge({
+         :osfamily => 'Debian'
+      }))
     end
 
     let :platform_params do
@@ -277,7 +279,10 @@ describe 'neutron::plugins::ml2' do
 
   context 'on RedHat platforms' do
     let :facts do
-      default_facts.merge({ :osfamily => 'RedHat' })
+      @default_facts.merge(test_facts.merge({
+         :osfamily               => 'RedHat',
+         :operatingsystemrelease => '7'
+      }))
     end
 
     let :platform_params do

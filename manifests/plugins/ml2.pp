@@ -32,7 +32,7 @@
 # [*extension_drivers*]
 #   (optional) Ordered list of extension driver entrypoints to be loaded
 #   from the neutron.ml2.extension_drivers namespace.
-#   Defaults to empty list
+#   Defaults to $::os_service_default
 #
 # [*tenant_network_types*]
 #   (optional) Ordered list of network_types to allocate as tenant networks.
@@ -112,7 +112,7 @@
 # [*physical_network_mtus*]
 #   (optional) For L2 mechanism drivers, per-physical network MTU setting.
 #   Should be an array with 'physnetX1:9000'.
-#   Defaults to undef.
+#   Defaults to $::os_service_default.
 #
 # [*path_mtu*]
 #   (optional) For L3 mechanism drivers, determines the maximum permissible
@@ -123,7 +123,7 @@
 
 class neutron::plugins::ml2 (
   $type_drivers              = ['local', 'flat', 'vlan', 'gre', 'vxlan'],
-  $extension_drivers         = [],
+  $extension_drivers         = $::os_service_default,
   $tenant_network_types      = ['local', 'flat', 'vlan', 'gre', 'vxlan'],
   $mechanism_drivers         = ['openvswitch', 'linuxbridge'],
   $flat_networks             = '*',
@@ -135,7 +135,7 @@ class neutron::plugins::ml2 (
   $package_ensure            = 'present',
   $supported_pci_vendor_devs = ['15b3:1004', '8086:10ca'],
   $sriov_agent_required      = false,
-  $physical_network_mtus     = undef,
+  $physical_network_mtus     = $::os_service_default,
   $path_mtu                  = 0,
 ) {
 
@@ -145,10 +145,6 @@ class neutron::plugins::ml2 (
 
   if ! $mechanism_drivers {
     warning('Without networking mechanism driver, ml2 will not communicate with L2 agents')
-  }
-
-  if !empty($extension_drivers) {
-    neutron_plugin_ml2 { 'ml2/extension_drivers': value => join(any2array($extension_drivers), ',') }
   }
 
   if $::operatingsystem == 'Ubuntu' {
@@ -208,10 +204,11 @@ class neutron::plugins::ml2 (
     'ml2/tenant_network_types':             value => join(any2array($tenant_network_types), ',');
     'ml2/mechanism_drivers':                value => join(any2array($mechanism_drivers), ',');
     'ml2/path_mtu':                         value => $path_mtu;
+    'ml2/extension_drivers':                value => join(any2array($extension_drivers), ',');
     'securitygroup/enable_security_group':  value => $enable_security_group;
   }
 
-  if empty($physical_network_mtus) {
+  if is_service_default($physical_network_mtus) {
     neutron_plugin_ml2 {
       'ml2/physical_network_mtus': ensure => absent;
     }

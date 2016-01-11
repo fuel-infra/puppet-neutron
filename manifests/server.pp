@@ -18,7 +18,7 @@
 #
 # [*service_name*]
 #   (optional) The name of the neutron-server service
-#   Defaults to 'neutron-server'
+#   Defaults to $::neutron::params::server_service
 #
 # [*log_file*]
 #   REMOVED: Use log_file of neutron class instead.
@@ -34,28 +34,10 @@
 #   (optional) What auth system to use
 #   Defaults to 'keystone'. Can other be 'noauth'
 #
-# [*auth_host*]
-#   (optional) DEPRECATED. The keystone host
-#   Defaults to localhost.
-#
-# [*auth_protocol*]
-#   (optional) DEPRECATED. The protocol used to access the auth host
-#   Defaults to http.
-#
-# [*auth_port*]
-#   (optional) DEPRECATED. The keystone auth port
-#   Defaults to 35357.
-#
-# [*auth_admin_prefix*]
-#   (optional) The admin_prefix used to admin endpoint of the auth host
-#   This allow admin auth URIs like http://auth_host:35357/keystone.
-#   (where '/keystone' is the admin prefix)
-#   Defaults to false for empty. If defined, should be a string with a leading '/' and no trailing '/'.
-#
 # [*auth_region*]
 #   (optional) The authentication region. Note this value is case-sensitive and
 #   must match the endpoint region defined in Keystone.
-#   Defaults to undef
+#   Defaults to $::os_service_default
 #
 # [*auth_tenant*]
 #   (optional) The tenant of the auth user
@@ -67,11 +49,11 @@
 #
 # [*auth_uri*]
 #   (optional) Complete public Identity API endpoint.
-#   Defaults to: false
+#   Defaults to: 'http://localhost:5000/'
 #
 # [*identity_uri*]
 #   (optional) Complete admin Identity API endpoint.
-#   Defaults to: false
+#   Defaults to: 'http://localhost:35357/'
 #
 # [*database_connection*]
 #   (optional) Connection url for the neutron database.
@@ -151,7 +133,7 @@
 #   report_interval, to be sure the agent is down for good.
 #   agent_down_time is a config for neutron-server, set by class neutron::server
 #   report_interval is a config for neutron agents, set by class neutron
-#   Defaults to: 75
+#   Defaults to: $::os_service_default
 #
 # [*state_path*]
 #   (optional) Deprecated.  Use state_path parameter on base neutron class instead.
@@ -169,12 +151,12 @@
 #   (optional) Setting the "router_distributed" flag to "True" will default to the creation
 #   of distributed tenant routers.
 #   Also can be the type of the router on the create request (admin-only attribute).
-#   Defaults to false
+#   Defaults to $::os_service_default
 #
 # [*allow_automatic_l3agent_failover*]
 #   (optional) Allow automatic rescheduling of routers from dead L3 agents with
 #   admin_state_up set to True to alive agents.
-#   Defaults to false
+#   Defaults to $::os_service_default
 #
 # [*l3_ha*]
 #   (optional) Enable high availability for virtual routers.
@@ -190,7 +172,7 @@
 #
 # [*l3_ha_net_cidr*]
 #   (optional) CIDR of the administrative network if HA mode is enabled.
-#   Defaults to '169.254.192.0/18'
+#   Defaults to $::os_service_default
 #
 # [*report_interval*]
 #   (optional) Deprecated, does nothing.
@@ -198,7 +180,7 @@
 #
 # [*qos_notification_drivers*]
 #   (optional) Drivers list to use to send the update notification
-#   Defaults to 'message_queue'.
+#   Defaults to $::os_service_default.
 #
 class neutron::server (
   $package_ensure                   = 'present',
@@ -206,12 +188,12 @@ class neutron::server (
   $manage_service                   = true,
   $service_name                     = $::neutron::params::server_service,
   $auth_password                    = false,
-  $auth_region                      = undef,
+  $auth_region                      = $::os_service_default,
   $auth_type                        = 'keystone',
   $auth_tenant                      = 'services',
   $auth_user                        = 'neutron',
-  $auth_uri                         = false,
-  $identity_uri                     = false,
+  $auth_uri                         = 'http://localhost:5000/',
+  $identity_uri                     = 'http://localhost:35357/',
   $database_connection              = undef,
   $database_max_retries             = undef,
   $database_idle_timeout            = undef,
@@ -222,29 +204,24 @@ class neutron::server (
   $sync_db                          = false,
   $api_workers                      = $::processorcount,
   $rpc_workers                      = $::processorcount,
-  $agent_down_time                  = '75',
+  $agent_down_time                  = $::os_service_default,
   $router_scheduler_driver          = 'neutron.scheduler.l3_agent_scheduler.ChanceScheduler',
-  $router_distributed               = false,
-  $allow_automatic_l3agent_failover = false,
+  $router_distributed               = $::os_service_default,
+  $allow_automatic_l3agent_failover = $::os_service_default,
   $l3_ha                            = false,
   $max_l3_agents_per_router         = 3,
   $min_l3_agents_per_router         = 2,
-  $l3_ha_net_cidr                   = '169.254.192.0/18',
-  $qos_notification_drivers         = 'message_queue',
+  $l3_ha_net_cidr                   = $::os_service_default,
+  $qos_notification_drivers         = $::os_service_default,
   # DEPRECATED PARAMETERS
-  $auth_host                        = 'localhost',
-  $auth_port                        = '35357',
-  $auth_protocol                    = 'http',
-  $auth_admin_prefix                = false,
   $log_dir                          = undef,
   $log_file                         = undef,
   $report_interval                  = undef,
   $state_path                       = undef,
   $lock_path                        = undef,
-) {
+) inherits ::neutron::params {
 
   include ::neutron::db
-  include ::neutron::params
   include ::neutron::policy
   require keystone::python
 
@@ -343,125 +320,17 @@ class neutron::server (
         'filter:authtoken/admin_password':    value => $auth_password, secret => true;
       }
 
-      # if both auth_uri and identity_uri are set we skip these deprecated settings entirely
-      if !$auth_uri or !$identity_uri {
-
-        if $auth_admin_prefix {
-          warning('The auth_admin_prefix parameter is deprecated. Please use auth_uri and identity_uri instead.')
-          validate_re($auth_admin_prefix, '^(/.+[^/])?$')
-          neutron_config {
-            'keystone_authtoken/auth_admin_prefix': value => $auth_admin_prefix;
-          }
-          neutron_api_config {
-            'filter:authtoken/auth_admin_prefix': value => $auth_admin_prefix;
-          }
-        } else {
-          neutron_config {
-            'keystone_authtoken/auth_admin_prefix': ensure => absent;
-          }
-          neutron_api_config {
-            'filter:authtoken/auth_admin_prefix': ensure => absent;
-          }
-        }
-
-        if $auth_host {
-          warning('The auth_host parameter is deprecated. Please use auth_uri and identity_uri instead.')
-          neutron_config {
-            'keystone_authtoken/auth_host': value => $auth_host;
-          }
-          neutron_api_config {
-            'filter:authtoken/auth_host': value => $auth_host;
-          }
-        } else{
-          neutron_config {
-            'keystone_authtoken/auth_host': ensure => absent;
-          }
-          neutron_api_config {
-            'filter:authtoken/auth_host': ensure => absent;
-          }
-        }
-
-        if $auth_port {
-          warning('The auth_port parameter is deprecated. Please use auth_uri and identity_uri instead.')
-          neutron_config {
-            'keystone_authtoken/auth_port': value => $auth_port;
-          }
-          neutron_api_config {
-            'filter:authtoken/auth_port': value => $auth_port;
-          }
-        } else{
-          neutron_config {
-            'keystone_authtoken/auth_port': ensure => absent;
-          }
-          neutron_api_config {
-            'filter:authtoken/auth_port': ensure => absent;
-          }
-        }
-
-        if $auth_protocol {
-          warning('The auth_protocol parameter is deprecated. Please use auth_uri and identity_uri instead.')
-          neutron_config {
-            'keystone_authtoken/auth_protocol': value => $auth_protocol;
-          }
-          neutron_api_config {
-            'filter:authtoken/auth_protocol': value => $auth_protocol;
-          }
-        } else{
-          neutron_config {
-            'keystone_authtoken/auth_protocol': ensure => absent;
-          }
-          neutron_api_config {
-            'filter:authtoken/auth_protocol': ensure => absent;
-          }
-        }
-      } else {
-        neutron_config {
-          'keystone_authtoken/auth_admin_prefix': ensure => absent;
-          'keystone_authtoken/auth_host': ensure => absent;
-          'keystone_authtoken/auth_port': ensure => absent;
-          'keystone_authtoken/auth_protocol': ensure => absent;
-        }
-        neutron_api_config {
-          'filter:authtoken/auth_admin_prefix': ensure => absent;
-          'filter:authtoken/auth_host': ensure => absent;
-          'filter:authtoken/auth_port': ensure => absent;
-          'filter:authtoken/auth_protocol': ensure => absent;
-        }
+      neutron_config {
+        'keystone_authtoken/auth_uri':     value => $auth_uri;
+        'keystone_authtoken/identity_uri': value => $identity_uri;
       }
-
-      if $auth_uri {
-        $auth_uri_real = $auth_uri
-      } elsif $auth_host and $auth_protocol and $auth_port {
-        $auth_uri_real = "${auth_protocol}://${auth_host}:5000/"
+      neutron_api_config {
+        'filter:authtoken/auth_uri':     value => $auth_uri;
+        'filter:authtoken/identity_uri': value => $identity_uri;
       }
 
       neutron_config {
-        'keystone_authtoken/auth_uri': value => $auth_uri_real;
-      }
-      neutron_api_config {
-        'filter:authtoken/auth_uri': value => $auth_uri_real;
-      }
-
-      if $auth_region {
-        neutron_config {
-          'keystone_authtoken/auth_region': value => $auth_region;
-        }
-      }
-
-      if $identity_uri {
-        neutron_config {
-          'keystone_authtoken/identity_uri': value => $identity_uri;
-        }
-        neutron_api_config {
-          'filter:authtoken/identity_uri': value => $identity_uri;
-        }
-      } else {
-        neutron_config {
-          'keystone_authtoken/identity_uri': ensure => absent;
-        }
-        neutron_api_config {
-          'filter:authtoken/identity_uri': ensure => absent;
-        }
+        'keystone_authtoken/auth_region': value => $auth_region;
       }
 
     }
@@ -483,6 +352,6 @@ class neutron::server (
     hasstatus  => true,
     hasrestart => true,
     require    => Class['neutron'],
-    tag        => 'neutron-service',
+    tag        => ['neutron-service', 'neutron-db-sync-service'],
   }
 }

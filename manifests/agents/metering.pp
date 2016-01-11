@@ -37,6 +37,9 @@
 # [*interface_driver*]
 #   (optional) Defaults to 'neutron.agent.linux.interface.OVSInterfaceDriver'.
 #
+# [*driver*]
+#   (optional) Defaults to 'neutron.services.metering.drivers.noop.noop_driver.NoopMeteringDriver'.
+#
 # [*measure_interval*]
 #   (optional) Interval between two metering measures.
 #   Defaults to 30.
@@ -51,7 +54,7 @@
 #   (optional) Deprecated. 'True' value will be enforced in future releases.
 #   Allow overlapping IP (Must have kernel build with
 #   CONFIG_NET_NS=y and iproute2 package that supports namespaces).
-#   Defaults to undef.
+#   Defaults to $::os_service_default.
 #
 
 class neutron::agents::metering (
@@ -60,10 +63,11 @@ class neutron::agents::metering (
   $manage_service   = true,
   $debug            = false,
   $interface_driver = 'neutron.agent.linux.interface.OVSInterfaceDriver',
-  $measure_interval = '30',
-  $report_interval  = '300',
+  $driver           = 'neutron.services.metering.drivers.noop.noop_driver.NoopMeteringDriver',
+  $measure_interval = $::os_service_default,
+  $report_interval  = $::os_service_default,
   # DEPRECATED PARAMETERS
-  $use_namespaces   = undef,
+  $use_namespaces   = $::os_service_default,
 ) {
 
   include ::neutron::params
@@ -77,11 +81,12 @@ class neutron::agents::metering (
   neutron_metering_agent_config {
     'DEFAULT/debug':              value => $debug;
     'DEFAULT/interface_driver':   value => $interface_driver;
+    'DEFAULT/driver':             value => $driver;
     'DEFAULT/measure_interval':   value => $measure_interval;
     'DEFAULT/report_interval':    value => $report_interval;
   }
 
-  if $use_namespaces != undef {
+  if ! is_service_default ($use_namespaces) {
     warning('The use_namespaces parameter is deprecated and will be removed in future releases')
     neutron_metering_agent_config {
       'DEFAULT/use_namespaces':   value => $use_namespaces;

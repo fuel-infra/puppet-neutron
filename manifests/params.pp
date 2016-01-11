@@ -43,6 +43,8 @@ class neutron::params {
 
     $nvp_server_package = 'openstack-neutron-nicira'
 
+    $nuage_config_file    = '/etc/neutron/plugins/nuage/plugin.ini'
+
     $dhcp_agent_package = false
     $dhcp_agent_service = 'neutron-dhcp-agent'
 
@@ -75,8 +77,8 @@ class neutron::params {
 
     $kernel_headers     = "linux-headers-${::kernelrelease}"
 
-    $psycopg_package_name = 'python-psycopg2'
     $sqlite_package_name  = undef
+    $pymysql_package_name = undef
 
   } elsif($::osfamily == 'Debian') {
 
@@ -93,8 +95,16 @@ class neutron::params {
       $ml2_server_package = false
     }
 
-    $ovs_agent_package   = 'neutron-plugin-openvswitch-agent'
-    $ovs_agent_service   = 'neutron-plugin-openvswitch-agent'
+    case $::os_package_type {
+      'debian': {
+        $ovs_agent_package   = 'neutron-openvswitch-agent'
+        $ovs_agent_service   = 'neutron-openvswitch-agent'
+      }
+      default: {
+        $ovs_agent_package   = 'neutron-plugin-openvswitch-agent'
+        $ovs_agent_service   = 'neutron-plugin-openvswitch-agent'
+      }
+    }
     $ovs_server_package  = 'neutron-plugin-openvswitch'
     $ovs_cleanup_service = false
     $ovs_package         = 'openvswitch-switch'
@@ -123,6 +133,8 @@ class neutron::params {
     $plumgrid_config_file       = '/etc/neutron/plugins/plumgrid/plumgrid.ini'
 
     $nvp_server_package = 'neutron-plugin-nicira'
+
+    $nuage_config_file    = '/etc/neutron/plugins/nuage/plugin.ini'
 
     $dhcp_agent_package = 'neutron-dhcp-agent'
     $dhcp_agent_service = 'neutron-dhcp-agent'
@@ -155,8 +167,8 @@ class neutron::params {
     $cliff_package      = 'python-cliff'
     $kernel_headers     = "linux-headers-${::kernelrelease}"
 
-    $psycopg_package_name = 'python-psycopg2'
     $sqlite_package_name  = 'python-pysqlite2'
+    $pymysql_package_name = 'python-pymysql'
   } else {
 
     fail("Unsupported osfamily ${::osfamily}")
