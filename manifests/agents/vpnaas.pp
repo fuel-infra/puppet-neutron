@@ -68,6 +68,17 @@ class neutron::agents::vpnaas (
         name   => $::neutron::params::openswan_package,
       }
     }
+    /\.LibreSwan/: {
+      if($::osfamily != 'Redhat') {
+        fail("LibreSwan is not supported on osfamily ${::osfamily}")
+      } else {
+        Package['libreswan'] -> Package<| title == 'neutron-vpnaas-agent' |>
+        package { 'libreswan':
+          ensure => present,
+          name   => $::neutron::params::libreswan_package,
+        }
+      }
+    }
     default: {
       fail("Unsupported vpn_device_driver ${vpn_device_driver}")
     }
@@ -91,12 +102,12 @@ class neutron::agents::vpnaas (
   }
 
   if $::neutron::params::vpnaas_agent_package {
-    Package['neutron']            -> Package['neutron-vpnaas-agent']
-    package { 'neutron-vpnaas-agent':
-      ensure => $package_ensure,
-      name   => $::neutron::params::vpnaas_agent_package,
-      tag    => ['openstack', 'neutron-package'],
-    }
+    Package['neutron'] -> Package['neutron-vpnaas-agent']
+    ensure_resource( 'package', 'neutron-vpnaas-agent', {
+      'ensure' => $package_ensure,
+      'name'   => $::neutron::params::vpnaas_agent_package,
+      'tag'    => ['openstack', 'neutron-package'],
+    })
   }
 
   if $manage_service {
